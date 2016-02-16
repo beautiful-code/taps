@@ -231,6 +231,33 @@ class Operation
 
     klass.new(database_url, remote_url, opts)
   end
+
+  def read_char
+    # Ref: https://gist.github.com/acook/4190379
+    STDIN.echo = false
+    STDIN.raw!
+
+    input = STDIN.getc.chr
+    if input == "\e" then
+      input << STDIN.read_nonblock(3) rescue nil
+      input << STDIN.read_nonblock(2) rescue nil
+    end
+  ensure
+    STDIN.echo = true
+    STDIN.cooked!
+
+    return input
+  end
+
+  def ask_to_wait
+    STDOUT.print "Do you want to make schema changes before exporting the data? (Y/n)"
+    char = read_char
+
+    if ["y","Y","Yes","\r"].include?(char)
+      STDOUT.print "\nPress enter when you are ready"
+      STDIN.gets.chomp
+    end
+  end
 end
 
 class Pull < Operation
@@ -248,6 +275,8 @@ class Pull < Operation
         pull_schema if !skip_schema?
         pull_indexes if indexes_first? && !skip_schema?
       end
+
+      ask_to_wait
       setup_signal_trap
       pull_partial_data if resuming?
       pull_data
@@ -407,6 +436,8 @@ class Push < Operation
         push_schema if !skip_schema?
         push_indexes if indexes_first? && !skip_schema?
       end
+
+      ask_to_wait
       setup_signal_trap
       push_partial_data if resuming?
       push_data
